@@ -1,0 +1,40 @@
+services:
+  ds1:
+    image: datastore
+    hostname: dstore1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "/home/madalv/Univer/pr/distributed-datastore/config1:/app/config"
+    ports:
+      - "8070:8070"
+    networks:
+      - cluster
+  ds2:
+    image: datastore
+    hostname: dstore2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "/home/madalv/Univer/pr/distributed-datastore/config2:/app/config"
+    ports:
+      - "8080:8080"
+    networks:
+      - cluster
+  ds3:
+    image: datastore
+    hostname: dstore3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - "/home/madalv/Univer/pr/distributed-datastore/config3:/app/config"
+    ports:
+      - "8090:8090"
+    networks:
+      - cluster
+networks:
+  cluster:
+    name: cluster

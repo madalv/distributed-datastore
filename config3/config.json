@@ -1,0 +1,6 @@
+{
+  "http_port": 8090,
+  "tcp_port": 8091,
+  "udp_port": 8092,
+  "host": "dstore3"
+}
