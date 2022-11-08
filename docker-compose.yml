@@ -6,9 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - "/home/madalv/Univer/pr/distributed-datastore/config1:/app/config"
+      - "/home/madalv/Univer/pr/distributed-datastore/config1:/app/config1"
     ports:
       - "8070:8070"
+      - "8071:8071"
+      - "8072:8072"
     networks:
       - cluster
   ds2:
@@ -18,9 +20,11 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - "/home/madalv/Univer/pr/distributed-datastore/config2:/app/config"
+      - "/home/madalv/Univer/pr/distributed-datastore/config2:/app/config1"
     ports:
       - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
     networks:
       - cluster
   ds3:
@@ -30,9 +34,11 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - "/home/madalv/Univer/pr/distributed-datastore/config3:/app/config"
+      - "/home/madalv/Univer/pr/distributed-datastore/config3:/app/config1"
     ports:
       - "8090:8090"
+      - "8091:8091"
+      - "8092:8092"
     networks:
       - cluster
 networks:
