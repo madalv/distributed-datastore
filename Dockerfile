@@ -16,5 +16,6 @@ RUN gradle buildFatJar -i --stacktrace
 FROM openjdk:11-slim
 
 WORKDIR /app
+COPY --from=builder /src/nodes ./nodes
 COPY --from=builder /src/build/libs/*jar ./app.jar
 ENTRYPOINT ["java","-jar","app.jar"]
