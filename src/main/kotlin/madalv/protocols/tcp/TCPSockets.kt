@@ -45,7 +45,7 @@ object TCP {
                                         node.electionManager.voteResponseChannel.send(vr)
                                     }
                                     else -> {
-
+                                        println("UNKOWN MESSAGE TYPE TCP CONN: ${message.messageType}")
                                     }
                                 }
                             }

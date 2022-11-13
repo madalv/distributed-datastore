@@ -6,6 +6,7 @@ import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import madalv.datastore.DatastoreRequest
 import madalv.log.LogRequest
 import madalv.message.Message
 import madalv.message.MessageType
@@ -41,8 +42,16 @@ object UDP {
                             val lr = Json.decodeFromString(LogRequest.serializer(), message.data)
                             node.electionManager.receiveLogRequest(lr)
                         }
+                        MessageType.UPDATE_REQUEST -> {
+                            val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                            node.datastore.update(dr.key!!, dr.data!!)
+                        }
+                        MessageType.DELETE_REQUEST -> {
+                            val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                            node.datastore.delete(dr.key!!)
+                        }
                         else -> {
-
+                            println("UNKOWN MESSAGE TYPE UDP CONN: ${message.messageType}")
                         }
                     }
                 }

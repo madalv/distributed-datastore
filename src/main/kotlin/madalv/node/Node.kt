@@ -1,10 +1,15 @@
 package madalv.node
 
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import madalv.datastore.Datastore
 import madalv.election.ElectionManager
+import madalv.protocols.tcp.TCP
+import madalv.protocols.udp.UDP
 
 @Serializable
 class Node(
@@ -23,6 +28,19 @@ class Node(
     //
     @Transient var datastore: Datastore = Datastore()
 
+
+    //TODO move this to comm manager
+    @Transient val udpClient = UDP.Client
+    @Transient val tcpClient = TCP.Client
+
+
+    //TODO move this to comm manager
+    @OptIn(DelicateCoroutinesApi::class)
+    fun broadcast(message: String) {
+        GlobalScope.launch {
+            UDP.Client.broadcast(message)
+        }
+    }
     fun setCluster(nodes: Map<Int, Node>) {
         cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
     }

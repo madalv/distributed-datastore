@@ -1,31 +1,34 @@
 package madalv.datastore
 
+import java.nio.charset.Charset
 import java.util.UUID
 
 class Datastore {
     private val map = HashMap<UUID, ByteArray>()
 
-    fun create(data: ByteArray) {
-        try {
+    @Synchronized
+    fun create(data: ByteArray): UUID {
+        return try {
             val uuid = UUID.randomUUID()
             map[uuid] = data
-            println("CREATED $uuid $data")
+            println("CREATED $uuid ${String(data, Charset.defaultCharset())}")
+            uuid
         } catch(e: Exception) {
-            println(e.message)
+            throw e
         }
     }
 
+    @Synchronized
     fun read(key: UUID): ByteArray {
         return try {
             println("READ $key")
             map[key]!!
-
         } catch (e: Exception) {
-            println(e.message)
-            ByteArray(0)
+            throw e
         }
     }
 
+    @Synchronized
     fun update(key: UUID, data: ByteArray) {
         try {
             map[key] = data
@@ -35,6 +38,7 @@ class Datastore {
         }
     }
 
+    @Synchronized
     fun delete(key: UUID) {
         try {
             map.remove(key)
