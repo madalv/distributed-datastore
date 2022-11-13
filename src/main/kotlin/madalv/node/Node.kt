@@ -3,6 +3,7 @@ package madalv.node
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import madalv.datastore.Datastore
 import madalv.election.ElectionManager
 
 @Serializable
@@ -19,6 +20,8 @@ class Node(
     @Transient var electionManager: ElectionManager = ElectionManager(this)
     // current role, according to the raft algorithm
     @Transient var currentRole: Role = Role.FOLLOWER
+    //
+    @Transient var datastore: Datastore = Datastore()
 
     fun setCluster(nodes: Map<Int, Node>) {
         cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
@@ -29,6 +32,10 @@ class Node(
 
     fun leaderExists(): Boolean {
         return electionManager.currentLeader != null
+    }
+
+    fun isLeader(): Boolean {
+        return currentRole == Role.LEADER
     }
 
 }

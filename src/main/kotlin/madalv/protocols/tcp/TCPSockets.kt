@@ -22,7 +22,7 @@ object TCP {
         @JvmStatic
         fun start() {
             runBlocking {
-                val serverSocket = aSocket(selectorManager).tcp().bind(InetSocketAddress("0.0.0.0", DefaultPort))
+                val serverSocket = aSocket(selectorManager).tcp().bind(InetSocketAddress(node.host, DefaultPort))
                 println("TCP Server listening at ${serverSocket.localAddress}")
 
                 while (true) {

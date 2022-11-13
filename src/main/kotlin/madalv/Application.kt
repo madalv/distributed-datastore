@@ -20,8 +20,7 @@ import java.io.File
 
 val node = init()
 
-// TODO HTTP CRUD interface
-// TODO add datastore
+// TODO data replication
 // TODO start timer for leader timeout
 
 suspend fun main() {

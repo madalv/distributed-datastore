@@ -21,7 +21,7 @@ object UDP {
         @JvmStatic
         fun start() {
             runBlocking {
-                val serverSocket = aSocket(selectorManager).udp().bind(InetSocketAddress("0.0.0.0", DefaultPort))
+                val serverSocket = aSocket(selectorManager).udp().bind(InetSocketAddress(node.host, DefaultPort))
                 println("UDP Server listening at ${serverSocket.localAddress}")
 
                 for (datagram in serverSocket.incoming) {
