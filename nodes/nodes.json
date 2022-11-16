@@ -1,0 +1,23 @@
+{
+  "0":{
+    "id": 0,
+    "http_port": 8070,
+    "tcp_port": 8071,
+    "udp_port": 8072,
+    "host": "dstore1"
+  },
+  "1":{
+    "id": 1,
+    "http_port": 8080,
+    "tcp_port": 8081,
+    "udp_port": 8082,
+    "host": "dstore2"
+  },
+  "2": {
+    "id": 2,
+    "http_port": 8090,
+    "tcp_port": 8091,
+    "udp_port": 8092,
+    "host": "dstore3"
+  }
+}
