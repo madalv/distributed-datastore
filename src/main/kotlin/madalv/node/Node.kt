@@ -1,5 +1,6 @@
 package madalv.node
 
+import io.ktor.network.sockets.*
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -38,9 +39,17 @@ class Node(
     @OptIn(DelicateCoroutinesApi::class)
     fun broadcast(message: String) {
         GlobalScope.launch {
-            UDP.Client.broadcast(message)
+            udpClient.broadcast(message)
         }
     }
+    //TODO move this to comm manager
+    fun send(nodeId: Int, message: String) {
+        tcpClient.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
+    }
+//    fun get(nodeId: Int, message: String): ByteArray {
+//        return tcpClient.get(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
+//    }
+
     fun setCluster(nodes: Map<Int, Node>) {
         cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
     }

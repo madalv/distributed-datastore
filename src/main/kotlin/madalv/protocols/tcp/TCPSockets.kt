@@ -3,15 +3,19 @@ package madalv.protocols.tcp
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import madalv.datastore.DatastoreRequest
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.message.VoteResponse
 import madalv.node
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
 
 object TCP {
     private val selectorManager = ActorSelectorManager(Dispatchers.IO)
@@ -28,7 +32,9 @@ object TCP {
                 while (true) {
                     val socket = serverSocket.accept()
                     val read = socket.openReadChannel()
-                    println("Accepted $socket")
+                    val write = socket.openWriteChannel(autoFlush = true)
+
+                    println("Accepted ${socket.remoteAddress}.")
                     launch {
                         try {
                             while (true) {
@@ -43,6 +49,11 @@ object TCP {
                                         val vr = Json.decodeFromString(VoteResponse.serializer(), message.data)
                                         println(" INCOMING VOTE REPSPONSE " + message.data)
                                         node.electionManager.voteResponseChannel.send(vr)
+                                    }
+                                    MessageType.GET_REQUEST -> {
+                                        val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                                        val data = node.datastore.read(dr.key!!)
+                                        write.writeStringUtf8(data.toString() + "\n")
                                     }
                                     else -> {
                                         println("UNKOWN MESSAGE TYPE TCP CONN: ${message.messageType}")
@@ -62,26 +73,9 @@ object TCP {
 
     object Client {
         @JvmStatic
-//        fun main() {
-//            runBlocking {
-//                val socket = aSocket(selectorManager).tcp().connect("0.0.0.0", port = DefaultPort)
-//                val read = socket.openReadChannel()
-//                val write = socket.openWriteChannel(autoFlush = true)
-//                val lines = listOf("a", "b", "c")
-//
-//                for (line in lines) {
-//                    println("client: $line")
-//                    write.writeStringUtf8("$line\n")
-//                }
-//            }
-//        }
-
-
         fun send(address: InetSocketAddress, message: String) {
             runBlocking {
-                //println("${address.hostname} ${address.port} $message")
                 val socket = aSocket(selectorManager).tcp().connect(address)
-                //val read = socket.openReadChannel()
                 val write = socket.openWriteChannel(autoFlush = true)
                 write.writeStringUtf8(message + "\n")
             }

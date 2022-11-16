@@ -1,10 +1,18 @@
 package madalv.protocols.http
 
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.request.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import madalv.datastore.DatastoreRequest
 import madalv.message.Message
@@ -14,6 +22,7 @@ import java.nio.charset.Charset
 import java.util.*
 import kotlin.random.Random
 
+@OptIn(DelicateCoroutinesApi::class)
 fun Application.configureRouting() {
 
     routing {
@@ -37,12 +46,26 @@ fun Application.configureRouting() {
             }
 
             get("/read/{id}") {
-                    val id: UUID = UUID.fromString(call.parameters["id"])
-                    call.respondText(String(node.datastore.read(id), Charset.defaultCharset()))
-//                    val dr = DatastoreRequest(id)
-//                    val message = Message(MessageType.READ_REQUEST, Json.encodeToString(DatastoreRequest.serializer(), dr))
+                val id: UUID = UUID.fromString(call.parameters["id"])
+                if (node.isLeader()) {
                     val nodeId = Random(System.currentTimeMillis()).nextInt(0, 3)
-                    // TODO add http client get
+
+                    if (nodeId == node.id) {
+                        call.respondText(String(node.datastore.read(id), Charset.defaultCharset()))
+                    } else {
+                        val n = node.cluster[nodeId]!!
+                        var data: ByteArray = ByteArray(0)
+
+                        GlobalScope.launch {
+                            data = client.get("http://${n.host}:${n.httpPort}/ds/read/${id}").body()
+                        }.join()
+
+                        println("Got from node $nodeId! data = ${String(data)}")
+                        call.respondText(String(data, Charset.defaultCharset()))
+                    }
+                } else {
+                    call.respondText(String(node.datastore.read(id), Charset.defaultCharset()))
+                }
             }
 
             put("/update/{id}") {
@@ -72,3 +95,9 @@ fun Application.configureRouting() {
         }
     }
 }
+
+val client = HttpClient(CIO) {
+    expectSuccess = true
+}
+
+
