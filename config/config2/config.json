@@ -1,4 +1,4 @@
 {
   "id": 1,
-  "election_timeout": 30000
+  "election_timeout": 6000
 }

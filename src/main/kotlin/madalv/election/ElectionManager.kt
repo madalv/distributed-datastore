@@ -23,7 +23,7 @@ class ElectionManager(val node: Node) {
     val udpClient = UDP.Client
     val tcpClient = TCP.Client
     var votedFor: Int? = null
-    val timer: Timer = Timer()
+    var electionTimer: Timer = Timer()
     var electionTimeout: Long? = null
     val voteResponseChannel: Channel<VoteResponse> = Channel(Channel.UNLIMITED)
     
@@ -47,7 +47,7 @@ class ElectionManager(val node: Node) {
         val message = Message(MessageType.VOTE_REQUEST, Json.encodeToString(VoteRequest.serializer(), request))
 
         GlobalScope.launch {
-            node.broadcast(Json.encodeToString(Message.serializer(), message))
+            UDP.Client.broadcast(Json.encodeToString(Message.serializer(), message))
         }
         startElectionTimer()
     }
@@ -79,7 +79,7 @@ class ElectionManager(val node: Node) {
                 if (votesReceived.size >= ((node.cluster.size + 2) / 2)) {
                     node.currentRole = Role.LEADER
                     currentLeader = node.id
-                    timer.cancel()
+                    electionTimer.cancel()
                     println("CONGRATS TO ${node.id} ON BECOMING THE LEADER!")
 
                     node.cluster.forEach { (_, n) ->
@@ -93,7 +93,7 @@ class ElectionManager(val node: Node) {
                 currentTerm = vr.term
                 node.currentRole = Role.FOLLOWER
                 votedFor = null
-                timer.cancel()
+                electionTimer.cancel()
             }
         }
     }
@@ -107,7 +107,8 @@ class ElectionManager(val node: Node) {
     }
 
     private fun startElectionTimer() {
-        timer.schedule(object: TimerTask() {
+        electionTimer = Timer()
+        electionTimer.schedule(object: TimerTask() {
             override fun run() {
                 initElection()
             }
@@ -116,10 +117,11 @@ class ElectionManager(val node: Node) {
 
 
     fun receiveLogRequest(lr: LogRequest) {
+        node.timeoutTimer.cancel()
         if (lr.currentTerm > currentTerm) {
             currentTerm = lr.currentTerm
             votedFor = null
-            timer.cancel()
+            electionTimer.cancel()
         }
         if (lr.currentTerm == currentTerm) {
             node.currentRole = Role.FOLLOWER
@@ -128,7 +130,7 @@ class ElectionManager(val node: Node) {
         }
 
         // TODO add log and ack stuff
-
+        node.startTimeoutTimer()
     }
 
     // TODO move this into log manager
@@ -137,8 +139,8 @@ class ElectionManager(val node: Node) {
         // TODO add actual log stuff
         val lr = LogRequest(leaderId, currentTerm,0, 0, 0, 0)
         val message = Message(MessageType.LOG_REQUEST, Json.encodeToString(LogRequest.serializer(), lr))
-        GlobalScope.launch{
-            node.broadcast(Json.encodeToString(Message.serializer(), message))
+        GlobalScope.launch {
+            UDP.Client.broadcast(Json.encodeToString(Message.serializer(), message))
         }
         println("Broadcasted log request to followers!")
     }
