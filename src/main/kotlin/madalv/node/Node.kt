@@ -9,6 +9,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import madalv.datastore.Datastore
 import madalv.election.ElectionManager
+import madalv.log.LogEntry
+import madalv.log.LogManager
+import madalv.message.Message
 import madalv.protocols.tcp.TCP
 import madalv.protocols.udp.UDP
 
@@ -29,6 +32,8 @@ class Node(
     //
     @Transient var datastore: Datastore = Datastore()
 
+    @Transient val logManager: LogManager = LogManager(this)
+
 
     //TODO move this to comm manager
     @Transient val udpClient = UDP.Client
@@ -46,9 +51,6 @@ class Node(
     fun send(nodeId: Int, message: String) {
         tcpClient.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
     }
-//    fun get(nodeId: Int, message: String): ByteArray {
-//        return tcpClient.get(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
-//    }
 
     fun setCluster(nodes: Map<Int, Node>) {
         cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
@@ -61,8 +63,29 @@ class Node(
         return electionManager.currentLeader != null
     }
 
+    fun log() : MutableList<LogEntry> {
+        return logManager.log
+    }
+
+    fun ackedLen(): HashMap<Int, Int> {
+        return logManager.ackedLength
+    }
+
+    fun sentLen(): HashMap<Int, Int> {
+        return logManager.sentLength
+    }
+
     fun isLeader(): Boolean {
         return currentRole == Role.LEADER
     }
+
+    fun currentLeader(): Int {
+        return electionManager.currentLeader!!
+    }
+
+    fun currentTerm(): Int {
+        return electionManager.currentTerm
+    }
+
 
 }
