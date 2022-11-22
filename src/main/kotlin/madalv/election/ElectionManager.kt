@@ -126,7 +126,6 @@ class ElectionManager(val node: Node) {
         if (lr.currentTerm == currentTerm) {
             node.currentRole = Role.FOLLOWER
             currentLeader = lr.leaderId
-            println("$currentLeader is the NEW LEADER!")
         }
 
         // TODO add log and ack stuff
@@ -142,6 +141,5 @@ class ElectionManager(val node: Node) {
         GlobalScope.launch {
             UDP.Client.broadcast(Json.encodeToString(Message.serializer(), message))
         }
-        println("Broadcasted log request to followers!")
     }
 }

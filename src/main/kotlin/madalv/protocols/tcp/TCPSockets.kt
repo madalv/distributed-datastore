@@ -55,6 +55,18 @@ object TCP {
                                         val data = node.datastore.read(dr.key!!)
                                         write.writeStringUtf8(data.toString() + "\n")
                                     }
+                                    MessageType.UPDATE_REQUEST -> {
+                                        val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                                        node.datastore.update(dr.key!!, dr.data!!)
+                                    }
+                                    MessageType.CREATE_REQUEST -> {
+                                        val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                                        node.datastore.create(dr.key!!, dr.data!!)
+                                    }
+                                    MessageType.DELETE_REQUEST -> {
+                                        val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
+                                        node.datastore.delete(dr.key!!)
+                                    }
                                     else -> {
                                         println("UNKOWN MESSAGE TYPE TCP CONN: ${message.messageType}")
                                     }
@@ -75,9 +87,13 @@ object TCP {
         @JvmStatic
         fun send(address: InetSocketAddress, message: String) {
             runBlocking {
-                val socket = aSocket(selectorManager).tcp().connect(address)
-                val write = socket.openWriteChannel(autoFlush = true)
-                write.writeStringUtf8(message + "\n")
+                try {
+                    val socket = aSocket(selectorManager).tcp().connect(address)
+                    val write = socket.openWriteChannel(autoFlush = true)
+                    write.writeStringUtf8(message + "\n")
+                } catch (e: Exception) {
+                    println("Couldn't send packet to ${address.hostname}:${address.port}")
+                }
             }
         }
     }

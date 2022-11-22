@@ -7,11 +7,14 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.Json
 import madalv.datastore.Datastore
+import madalv.datastore.DatastoreRequest
 import madalv.election.ElectionManager
 import madalv.log.LogEntry
 import madalv.log.LogManager
 import madalv.message.Message
+import madalv.message.MessageType
 import madalv.protocols.tcp.TCP
 import madalv.protocols.udp.UDP
 import java.util.*
@@ -124,5 +127,37 @@ class Node(
 
     fun isLeader(): Boolean {
         return currentRole == Role.LEADER
+    }
+
+    fun executeRequest(nodeId: Int, type: MessageType, dr: DatastoreRequest) {
+        when (type) {
+            MessageType.UPDATE_REQUEST -> {
+                if (nodeId == id) {
+                    datastore.update(dr.key!!, dr.data!!)
+                } else {
+                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
+                    send(nodeId, Json.encodeToString(Message.serializer(), message))
+                }
+            }
+            MessageType.CREATE_REQUEST -> {
+                if (nodeId == id) {
+                    datastore.create(dr.key!!, dr.data!!)
+                } else {
+                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
+                    send(nodeId, Json.encodeToString(Message.serializer(), message))
+                }
+            }
+            MessageType.DELETE_REQUEST -> {
+                if (nodeId == id) {
+                    datastore.delete(dr.key!!)
+                } else {
+                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
+                    send(nodeId, Json.encodeToString(Message.serializer(), message))
+                }
+            }
+            else -> {
+                println("Bruh")
+            }
+        }
     }
 }

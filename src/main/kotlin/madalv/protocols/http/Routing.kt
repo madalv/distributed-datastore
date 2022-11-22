@@ -7,6 +7,7 @@ import io.ktor.client.request.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import io.ktor.serialization.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.request.*
@@ -15,6 +16,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import madalv.datastore.DatastoreRequest
+import madalv.datastore.JumpHash
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.node
@@ -24,6 +26,7 @@ import kotlin.random.Random
 
 @OptIn(DelicateCoroutinesApi::class)
 fun Application.configureRouting() {
+
 
     routing {
         get("/") {
@@ -35,10 +38,17 @@ fun Application.configureRouting() {
             post("/create") {
                 if (node.isLeader()) {
                     val data: ByteArray = call.receive()
-                    val uuid = node.datastore.create(data)
+                    val uuid = UUID.randomUUID()
+
+                    val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
+                    val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
+
+                    println("Creating copies of data in nodes $ogNode and ${replicaNode}; $uuid")
+
                     val dr = DatastoreRequest(uuid, data)
-                    val message = Message(MessageType.UPDATE_REQUEST, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    node.broadcast(Json.encodeToString(Message.serializer(), message))
+
+                    node.executeRequest(ogNode, MessageType.CREATE_REQUEST, dr)
+                    node.executeRequest(replicaNode, MessageType.CREATE_REQUEST, dr)
 
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
@@ -46,36 +56,55 @@ fun Application.configureRouting() {
             }
 
             get("/read/{id}") {
-                val id: UUID = UUID.fromString(call.parameters["id"])
+                val uuid: UUID = UUID.fromString(call.parameters["id"])
                 if (node.isLeader()) {
-                    val nodeId = Random(System.currentTimeMillis()).nextInt(0, 3)
+                    val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
+                    val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
 
-                    if (nodeId == node.id) {
-                        call.respondText(String(node.datastore.read(id), Charset.defaultCharset()))
+                    println("Reaching for data in nodes $ogNode and $replicaNode")
+
+                    if (ogNode == node.id) {
+                        call.respondText(String(node.datastore.read(uuid), Charset.defaultCharset()))
                     } else {
-                        val n = node.cluster[nodeId]!!
-                        var data: ByteArray = ByteArray(0)
+                        val n = node.cluster[ogNode]!!
+                        var data: ByteArray = "Hz".toByteArray()
 
+                        // todo extend jump hashing for 3+ nodes
                         GlobalScope.launch {
-                            data = client.get("http://${n.host}:${n.httpPort}/ds/read/${id}").body()
+                            try {
+                                data = client.get("http://${n.host}:${n.httpPort}/ds/read/${uuid}").body()
+                            } catch (e: Exception) {
+                                try {
+                                    if (replicaNode == node.id) {
+                                        call.respondText(String(node.datastore.read(uuid), Charset.defaultCharset()))
+                                    } else {
+                                        val o = node.cluster[replicaNode]!!
+                                        data = client.get("http://${o.host}:${o.httpPort}/ds/read/${uuid}").body()
+                                    }
+                                } catch (e: Exception) {
+                                    println(e.message)
+                                }
+                            }
                         }.join()
 
-                        println("Got from node $nodeId! data = ${String(data)}")
                         call.respondText(String(data, Charset.defaultCharset()))
                     }
                 } else {
-                    call.respondText(String(node.datastore.read(id), Charset.defaultCharset()))
+                    call.respondText(String(node.datastore.read(uuid), Charset.defaultCharset()))
                 }
             }
 
             put("/update/{id}") {
                 if (node.isLeader()) {
-                    val id: UUID = UUID.fromString(call.parameters["id"])
+                    val uuid: UUID = UUID.fromString(call.parameters["id"])
+                    val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
+                    val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
                     val data: ByteArray = call.receive()
-                    node.datastore.update(id, data)
-                    val dr = DatastoreRequest(id, data)
-                    val message = Message(MessageType.UPDATE_REQUEST, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    node.broadcast(Json.encodeToString(Message.serializer(), message))
+                    val dr = DatastoreRequest(uuid, data)
+
+                    node.executeRequest(ogNode, MessageType.UPDATE_REQUEST, dr)
+                    node.executeRequest(replicaNode, MessageType.UPDATE_REQUEST, dr)
+
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }
@@ -83,11 +112,13 @@ fun Application.configureRouting() {
 
             delete("/delete/{id}") {
                 if (node.isLeader()) {
-                    val id: UUID = UUID.fromString(call.parameters["id"])
-                    node.datastore.delete(id)
-                    val dr = DatastoreRequest(id)
-                    val message = Message(MessageType.DELETE_REQUEST, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    node.broadcast(Json.encodeToString(Message.serializer(), message))
+                    val uuid: UUID = UUID.fromString(call.parameters["id"])
+                    val dr = DatastoreRequest(uuid)
+                    val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
+                    val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
+
+                    node.executeRequest(ogNode, MessageType.DELETE_REQUEST, dr)
+                    node.executeRequest(replicaNode, MessageType.DELETE_REQUEST, dr)
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }

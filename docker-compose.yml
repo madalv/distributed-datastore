@@ -1,7 +1,8 @@
 services:
   ds0:
     image: datastore
-    hostname: dstore1
+    hostname: dstore0
+    container_name: dstore0
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,7 +16,8 @@ services:
       - cluster
   ds1:
     image: datastore
-    hostname: dstore2
+    hostname: dstore1
+    container_name: dstore1
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,7 +31,8 @@ services:
       - cluster
   ds2:
     image: datastore
-    hostname: dstore3
+    hostname: dstore2
+    container_name: dstore2
     build:
       context: .
       dockerfile: Dockerfile
