@@ -63,12 +63,14 @@ object UDP {
         @JvmStatic
         suspend fun broadcast(message: String) {
             for (n in node.cluster) {
-                //println("sending hello to ${n.id}" )
-                val socket = aSocket(selectorManager).udp().connect(InetSocketAddress(n.value.host, n.value.udpPort))
-                val buffer = socket.openWriteChannel(true)
-                buffer.writeStringUtf8(message)
+                try{
+                    val socket = aSocket(selectorManager).udp().connect(InetSocketAddress(n.value.host, n.value.udpPort))
+                    val buffer = socket.openWriteChannel(true)
+                    buffer.writeStringUtf8(message)
+                } catch (e: Exception) {
+                    println("Couldn't send datagram to ${n.value.host}:${n.value.udpPort}")
+                }
             }
-
         }
     }
 }

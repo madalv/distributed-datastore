@@ -39,6 +39,8 @@ suspend fun main() {
 
     delay(node.electionManager.electionTimeout!!)
     if (!node.leaderExists()) node.electionManager.initElection()
+
+    node.startHeartbeatTimer()
 }
 
 fun Application.module() {
