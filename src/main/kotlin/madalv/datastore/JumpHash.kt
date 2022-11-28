@@ -2,8 +2,6 @@ package madalv.datastore
 
 import kotlin.random.Random
 
-// todo extend this bs for 4+ nodes?
-
 class JumpHash {
     companion object {
         private const val secretKey: String = "m-am_zb"

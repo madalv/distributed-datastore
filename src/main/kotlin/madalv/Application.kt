@@ -20,9 +20,6 @@ import java.io.File
 
 val node = init()
 
-// TODO start timer for leader timeout
-// TODO implement rest of raft
-
 suspend fun main() {
     // launch tcp server
     CoroutineScope(Dispatchers.Default).launch {

@@ -6,7 +6,6 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import madalv.log.LogRequest
 import madalv.message.*
 import madalv.node.Node
 import madalv.node.Role
@@ -26,6 +25,7 @@ class ElectionManager(val node: Node) {
     var electionTimer: Timer = Timer()
     var electionTimeout: Long? = null
     val voteResponseChannel: Channel<VoteResponse> = Channel(Channel.UNLIMITED)
+    var electionIsRunning: Boolean = false
     
     init {
         GlobalScope.launch {
@@ -54,9 +54,7 @@ class ElectionManager(val node: Node) {
 
     fun vote(vr: VoteRequest) {
         if (vr.term > currentTerm) {
-            currentTerm = vr.term
-            node.currentRole = Role.FOLLOWER
-            votedFor = null
+            resetNodeElectionStatus(vr.term)
         }
 
         val lastTerm: Int = if (node.log().size > 0) node.log()[node.log().lastIndex].term else 0
@@ -80,21 +78,28 @@ class ElectionManager(val node: Node) {
                     node.currentRole = Role.LEADER
                     currentLeader = node.id
                     electionTimer.cancel()
+                    electionIsRunning = false
                     println("CONGRATS TO ${node.id} ON BECOMING THE LEADER!")
 
                     node.cluster.forEach { (_, n) ->
                         node.sentLen()[n.id] = node.log().size
                         node.ackedLen()[n.id] = 0
                     }
-
-                    replicateLog(currentLeader!!)
+                    node.replicateLog(currentLeader!!)
                 }
             } else if (vr.term > currentTerm) {
-                currentTerm = vr.term
-                node.currentRole = Role.FOLLOWER
-                votedFor = null
-                electionTimer.cancel()
+                resetNodeElectionStatus(vr.term)
             }
+        }
+    }
+
+    fun resetNodeElectionStatus(newTerm: Int) {
+        currentTerm = newTerm
+        node.currentRole = Role.FOLLOWER
+        votedFor = null
+        if (electionIsRunning) {
+            electionTimer.cancel()
+            electionIsRunning = false
         }
     }
 
@@ -107,39 +112,12 @@ class ElectionManager(val node: Node) {
     }
 
     private fun startElectionTimer() {
+        electionIsRunning = true
         electionTimer = Timer()
         electionTimer.schedule(object: TimerTask() {
             override fun run() {
                 initElection()
             }
         }, electionTimeout!!)
-    }
-
-
-    fun receiveLogRequest(lr: LogRequest) {
-        node.timeoutTimer.cancel()
-        if (lr.currentTerm > currentTerm) {
-            currentTerm = lr.currentTerm
-            votedFor = null
-            electionTimer.cancel()
-        }
-        if (lr.currentTerm == currentTerm) {
-            node.currentRole = Role.FOLLOWER
-            currentLeader = lr.leaderId
-        }
-
-        // TODO add log and ack stuff
-        node.startTimeoutTimer()
-    }
-
-    // TODO move this into log manager
-    @OptIn(DelicateCoroutinesApi::class)
-    fun replicateLog(leaderId: Int) {
-        // TODO add actual log stuff
-        val lr = LogRequest(leaderId, currentTerm,0, 0, 0, 0)
-        val message = Message(MessageType.LOG_REQUEST, Json.encodeToString(LogRequest.serializer(), lr))
-        GlobalScope.launch {
-            UDP.Client.broadcast(Json.encodeToString(Message.serializer(), message))
-        }
     }
 }

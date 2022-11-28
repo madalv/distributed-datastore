@@ -13,14 +13,13 @@ import madalv.datastore.DatastoreRequest
 import madalv.election.ElectionManager
 import madalv.log.LogEntry
 import madalv.log.LogManager
+import madalv.log.LogRequest
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.protocols.tcp.TCP
 import madalv.protocols.udp.UDP
 import java.util.*
 import kotlin.collections.HashMap
-
-// todo jostkii refactoring
 
 @Serializable
 class Node(
@@ -36,24 +35,31 @@ class Node(
     @Transient var electionManager: ElectionManager = ElectionManager(this)
     // current role, according to the raft algorithm
     @Transient var currentRole: Role = Role.FOLLOWER
-
+    // datastore that actually keeps all data
     @Transient var datastore: Datastore = Datastore()
-
+    // deals with all Raft log stuff (replication, etc, etc)
     @Transient val logManager: LogManager = LogManager(this)
-
-
+    // socket clients responsible for sending stuff to other servers
     @Transient val udpClient = UDP.Client
     @Transient val tcpClient = TCP.Client
-
+    // timers, explained below
     @Transient var heartbeatTimer = Timer()
     @Transient var timeoutTimer = Timer()
 
-    @OptIn(DelicateCoroutinesApi::class)
-    fun broadcast(message: String) {
-        GlobalScope.launch {
-            udpClient.broadcast(message)
-        }
-    }
+//    @OptIn(DelicateCoroutinesApi::class)
+//    fun broadcast(message: String) {
+//        GlobalScope.launch {
+//            udpClient.broadcast(message)
+//        }
+//    }
+
+//    fun broadcastMsg(msg: Message) {
+//        if (currentRole === Role.LEADER) {
+//            logManager.log.add(LogEntry(msg, electionManager.currentTerm))
+//            logManager.ackedLength[id] = logManager.log.size
+//            logManager.replicateLog(id)
+//        } else println("Not broadcasting msg - not the leader.")
+//    }
 
     /*
     dumb name, but this is the timer that checks if the leader hasn't
@@ -73,7 +79,7 @@ class Node(
         }, 10100)
     }
 
-    /*
+    /**
     timer that takes care of the repeated "heartbeat" log replication
     this repeated action lets followers know the leader ain't dead
     */
@@ -83,50 +89,10 @@ class Node(
             override fun run() {
                 if (currentRole === Role.LEADER) {
                     println("Heartbeat log replication...")
-                    electionManager.replicateLog(id)
+                    logManager.replicateLog(id)
                 }
             }
         }, electionManager.electionTimeout!! * 2, 5000 )
-    }
-
-    fun broadcastMsg(msg: Message) {
-        if (currentRole === Role.LEADER) {
-            logManager.log.add(LogEntry(msg, electionManager.currentTerm))
-            logManager.ackedLength[id] = logManager.log.size
-            electionManager.replicateLog(id)
-        } else println("Not broadcasting msg - not the leader.")
-    }
-
-    //TODO move this to comm manager
-    fun send(nodeId: Int, message: String) {
-        tcpClient.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
-    }
-
-    fun setCluster(nodes: Map<Int, Node>) {
-        cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
-    }
-    override fun toString(): String {
-        return "{id=$id http=$httpPort, udp=$udpPort, tcp=$tcpPort, host=$host}"
-    }
-
-    fun leaderExists(): Boolean {
-        return electionManager.currentLeader != null
-    }
-
-    fun log() : MutableList<LogEntry> {
-        return logManager.log
-    }
-
-    fun ackedLen(): HashMap<Int, Int> {
-        return logManager.ackedLength
-    }
-
-    fun sentLen(): HashMap<Int, Int> {
-        return logManager.sentLength
-    }
-
-    fun isLeader(): Boolean {
-        return currentRole == Role.LEADER
     }
 
     fun executeRequest(nodeId: Int, type: MessageType, dr: DatastoreRequest) {
@@ -159,5 +125,56 @@ class Node(
                 println("Bruh")
             }
         }
+    }
+
+    fun send(nodeId: Int, message: String) {
+        tcpClient.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
+    }
+
+    fun setCluster(nodes: Map<Int, Node>) {
+        cluster = nodes.filter { m -> m.key != id } as HashMap<Int, Node>
+    }
+    override fun toString(): String {
+        return "{id=$id http=$httpPort, udp=$udpPort, tcp=$tcpPort, host=$host}"
+    }
+
+    fun leaderExists(): Boolean {
+        return electionManager.currentLeader != null
+    }
+
+    fun log() : MutableList<LogEntry> {
+        return logManager.log
+    }
+
+    fun ackedLen(): HashMap<Int, Int> {
+        return logManager.ackedLength
+    }
+
+    fun sentLen(): HashMap<Int, Int> {
+        return logManager.sentLength
+    }
+
+    fun isLeader(): Boolean {
+        return currentRole == Role.LEADER
+    }
+
+    fun replicateLog(leaderId: Int) {
+        logManager.replicateLog(leaderId)
+    }
+
+    fun currentTerm(): Int {
+        return electionManager.currentTerm
+    }
+
+    fun setCurrentLeader(leaderId: Int){
+        electionManager.currentLeader = leaderId
+    }
+
+    fun resetNodeElectionStatus(newTerm: Int) {
+        electionManager.resetNodeElectionStatus(newTerm)
+    }
+
+    fun receiveLogRequest(lr: LogRequest) {
+        logManager.receiveLogRequest(lr)
     }
 }

@@ -14,11 +14,8 @@ data class DatastoreRequest(
     @Serializable(with = UUIDSerializer::class)
     @SerialName("key") val key: UUID? = null,
     @SerialName("data") val data: ByteArray? = null
-
 )
 
-
-// TODO move this shit somewhere else
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
 

@@ -50,11 +50,6 @@ object TCP {
                                         println(" INCOMING VOTE REPSPONSE " + message.data)
                                         node.electionManager.voteResponseChannel.send(vr)
                                     }
-                                    MessageType.GET_REQUEST -> {
-                                        val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
-                                        val data = node.datastore.read(dr.key!!)
-                                        write.writeStringUtf8(data.toString() + "\n")
-                                    }
                                     MessageType.UPDATE_REQUEST -> {
                                         val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
                                         node.datastore.update(dr.key!!, dr.data!!)
