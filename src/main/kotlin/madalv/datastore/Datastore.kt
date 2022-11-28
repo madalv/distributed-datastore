@@ -25,7 +25,7 @@ class Datastore {
     @Synchronized
     fun read(key: UUID): ByteArray {
         return try {
-            println("READ $key")
+            //println("READ $key")
             map[key]!!
         } catch (e: Exception) {
             throw e
@@ -58,5 +58,10 @@ class Datastore {
         } catch (e: Exception) {
             println(e)
         }
+    }
+
+    @Synchronized
+    fun containsKey(key: UUID): Boolean {
+        return map.containsKey(key)
     }
 }

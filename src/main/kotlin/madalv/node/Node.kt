@@ -1,9 +1,6 @@
 package madalv.node
 
 import io.ktor.network.sockets.*
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -19,7 +16,6 @@ import madalv.message.MessageType
 import madalv.protocols.tcp.TCP
 import madalv.protocols.udp.UDP
 import java.util.*
-import kotlin.collections.HashMap
 
 @Serializable
 class Node(
@@ -46,25 +42,13 @@ class Node(
     @Transient var heartbeatTimer = Timer()
     @Transient var timeoutTimer = Timer()
 
-//    @OptIn(DelicateCoroutinesApi::class)
-//    fun broadcast(message: String) {
-//        GlobalScope.launch {
-//            udpClient.broadcast(message)
-//        }
-//    }
+    @Transient val timeoutPeriod: Long = 10100
+    @Transient val heartbeatInterval: Long = 5000
 
-//    fun broadcastMsg(msg: Message) {
-//        if (currentRole === Role.LEADER) {
-//            logManager.log.add(LogEntry(msg, electionManager.currentTerm))
-//            logManager.ackedLength[id] = logManager.log.size
-//            logManager.replicateLog(id)
-//        } else println("Not broadcasting msg - not the leader.")
-//    }
-
-    /*
+    /**
     dumb name, but this is the timer that checks if the leader hasn't
     sent a heartbeat in a while (currently 10 sec)
-    in the receiveLogRequest() function, it is canceled (if follower received the heartbeat log request)
+    in the receiveLogRequest() function, it is canceled (if follower received the heartbeat log request).
     if 10 sec pass by and it isn't canceled, node considers leader dead and inits an election
     */
     fun startTimeoutTimer() {
@@ -76,11 +60,11 @@ class Node(
                     electionManager.initElection()
                 }
             }
-        }, 10100)
+        }, timeoutPeriod + Random(System.currentTimeMillis()).nextInt(1000))
     }
 
     /**
-    timer that takes care of the repeated "heartbeat" log replication
+    timer that takes care of the repeated "heartbeat" log replication.
     this repeated action lets followers know the leader ain't dead
     */
     fun startHeartbeatTimer() {
@@ -92,39 +76,30 @@ class Node(
                     logManager.replicateLog(id)
                 }
             }
-        }, electionManager.electionTimeout!! * 2, 5000 )
+        }, electionManager.electionTimeout!! * 2, heartbeatInterval)
     }
 
-    fun executeRequest(nodeId: Int, type: MessageType, dr: DatastoreRequest) {
-        when (type) {
-            MessageType.UPDATE_REQUEST -> {
-                if (nodeId == id) {
-                    datastore.update(dr.key!!, dr.data!!)
-                } else {
-                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    send(nodeId, Json.encodeToString(Message.serializer(), message))
-                }
-            }
-            MessageType.CREATE_REQUEST -> {
-                if (nodeId == id) {
-                    datastore.create(dr.key!!, dr.data!!)
-                } else {
-                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    send(nodeId, Json.encodeToString(Message.serializer(), message))
-                }
-            }
-            MessageType.DELETE_REQUEST -> {
-                if (nodeId == id) {
-                    datastore.delete(dr.key!!)
-                } else {
-                    val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
-                    send(nodeId, Json.encodeToString(Message.serializer(), message))
-                }
-            }
-            else -> {
-                println("Bruh")
+    fun executeRequest(nodes: Set<Int>, type: MessageType, dr: DatastoreRequest) {
+        val message = Message(type, Json.encodeToString(DatastoreRequest.serializer(), dr))
+        val le = LogEntry(message, currentTerm(), nodes, id)
+        logManager.ackedLength[id]  = log().size
+        appendLogEntry(le)
+
+        for (nodeId in nodes) {
+            if (nodeId == id) when (type) {
+                MessageType.UPDATE_REQUEST -> datastore.update(dr.key!!, dr.data!!)
+                MessageType.CREATE_REQUEST -> datastore.create(dr.key!!, dr.data!!)
+                MessageType.DELETE_REQUEST -> datastore.delete(dr.key!!)
+                else -> println("Bruh")
+            } else {
+                send(nodeId, Json.encodeToString(Message.serializer(), message))
             }
         }
+    }
+
+    fun appendLogEntry(le: LogEntry) {
+        println("appending $le to log, size ${log().size}")
+        logManager.log.add(le)
     }
 
     fun send(nodeId: Int, message: String) {

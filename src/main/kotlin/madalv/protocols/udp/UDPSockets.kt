@@ -37,10 +37,6 @@ object UDP {
                         MessageType.VOTE_RESPONSE -> {
                             println("ERROR - why sending vote response (1 to 1 comm) thru UDP?")
                         }
-                        MessageType.LOG_REQUEST -> {
-                            val lr = Json.decodeFromString(LogRequest.serializer(), message.data)
-                            node.receiveLogRequest(lr)
-                        }
                         MessageType.UPDATE_REQUEST -> {
                             val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
                             node.datastore.update(dr.key!!, dr.data!!)

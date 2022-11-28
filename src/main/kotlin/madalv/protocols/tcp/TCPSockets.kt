@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import madalv.datastore.DatastoreRequest
+import madalv.log.LogRequest
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.message.VoteResponse
@@ -34,7 +35,7 @@ object TCP {
                     val read = socket.openReadChannel()
                     val write = socket.openWriteChannel(autoFlush = true)
 
-                    println("Accepted ${socket.remoteAddress}.")
+                    //println("Accepted ${socket.remoteAddress}.")
                     launch {
                         try {
                             while (true) {
@@ -61,6 +62,14 @@ object TCP {
                                     MessageType.DELETE_REQUEST -> {
                                         val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)
                                         node.datastore.delete(dr.key!!)
+                                    }
+                                    MessageType.LOG_REQUEST -> {
+                                        val lr = Json.decodeFromString(LogRequest.serializer(), message.data)
+                                        node.receiveLogRequest(lr)
+                                    }
+                                    MessageType.LOG_RESPONSE -> {
+                                        val lr = Json.decodeFromString(LogRequest.serializer(), message.data)
+                                        node.receiveLogRequest(lr)
                                     }
                                     else -> {
                                         println("UNKOWN MESSAGE TYPE TCP CONN: ${message.messageType}")

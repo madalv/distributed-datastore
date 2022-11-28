@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import madalv.datastore.DatastoreRequest
 import madalv.datastore.JumpHash
+import madalv.log.LogEntry
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.node
@@ -34,21 +35,15 @@ fun Application.configureRouting() {
         }
 
         route("/ds") {
-
             post("/create") {
                 if (node.isLeader()) {
                     val data: ByteArray = call.receive()
                     val uuid = UUID.randomUUID()
-
                     val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
                     val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
-
                     println("Creating copies of data in nodes $ogNode and ${replicaNode}; $uuid")
-
                     val dr = DatastoreRequest(uuid, data)
-
-                    node.executeRequest(ogNode, MessageType.CREATE_REQUEST, dr)
-                    node.executeRequest(replicaNode, MessageType.CREATE_REQUEST, dr)
+                    node.executeRequest(setOf(ogNode, replicaNode), MessageType.CREATE_REQUEST, dr)
 
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
@@ -69,7 +64,7 @@ fun Application.configureRouting() {
                         val n = node.cluster[ogNode]!!
                         var data: ByteArray = "Hz".toByteArray()
 
-                        // todo extend jump hashing for 3+ nodes
+                        // todo refactor this bs (+ extend jump hash for 4+ nodes)
                         GlobalScope.launch {
                             try {
                                 data = client.get("http://${n.host}:${n.httpPort}/ds/read/${uuid}").body()
@@ -86,7 +81,6 @@ fun Application.configureRouting() {
                                 }
                             }
                         }.join()
-
                         call.respondText(String(data, Charset.defaultCharset()))
                     }
                 } else {
@@ -101,10 +95,7 @@ fun Application.configureRouting() {
                     val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
                     val data: ByteArray = call.receive()
                     val dr = DatastoreRequest(uuid, data)
-
-                    node.executeRequest(ogNode, MessageType.UPDATE_REQUEST, dr)
-                    node.executeRequest(replicaNode, MessageType.UPDATE_REQUEST, dr)
-
+                    node.executeRequest(setOf(ogNode, replicaNode), MessageType.UPDATE_REQUEST, dr)
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }
@@ -116,9 +107,7 @@ fun Application.configureRouting() {
                     val dr = DatastoreRequest(uuid)
                     val ogNode = JumpHash.hash(uuid.toString(), node.cluster.size + 1)
                     val replicaNode = JumpHash.getDuplicateId(uuid.toString(), node.cluster.size + 1)
-
-                    node.executeRequest(ogNode, MessageType.DELETE_REQUEST, dr)
-                    node.executeRequest(replicaNode, MessageType.DELETE_REQUEST, dr)
+                    node.executeRequest(setOf(ogNode, replicaNode), MessageType.DELETE_REQUEST, dr)
                 } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }
@@ -130,5 +119,3 @@ fun Application.configureRouting() {
 val client = HttpClient(CIO) {
     expectSuccess = true
 }
-
-
