@@ -28,53 +28,34 @@ fun Application.configureRouting() {
             post("/create") {
                 if (node.isLeader()) {
                     runBlocking {
-                        val data: ByteArray = call.receive()
-                        val uuid = UUID.randomUUID()
-                        val replicaNodes = JumpHash.getDuplicates(uuid.toString(), node.cluster.size + 1)
-                        println("Creating copies of data in nodes $replicaNodes: $uuid")
-                        val dr = DatastoreRequest(uuid, data)
-                        node.executeRequest(replicaNodes, MessageType.CREATE_REQUEST, dr)
-                        call.respond(uuid.toString())
+                        if ((0..2).random() == 1) redirectCreate(call)
+                        else handleCreate(call)
                     }
-                } else {
+                } else if (call.request.header("Leader-Redirect") == "true") {
+                    runBlocking {
+                        handleCreate(call)
+                    }
+                }
+                else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }
             }
 
             get("/read/{id}") {
-                val uuid: UUID = UUID.fromString(call.parameters["id"])
                 if (node.isLeader()) {
-                    val nodes = JumpHash.getDuplicates(uuid.toString(), node.cluster.size + 1)
-                    var data: ByteArray? = null
-                    println("searching in $nodes")
-
-                    for (n in nodes)
-                        try {
-                            data = getData(n, uuid)
-                        } catch (_: Exception) {
-                            println("smth went wrong homie, can't get data from $n")
-                        } finally {
-                            if (data != null) {
-                                call.respondText(String(data, Charset.defaultCharset()))
-                                println("got $uuid from $n")
-                                break
-                            }
-                        }
+                    handleGet(call)
                 } else try {
+                    val uuid: UUID = UUID.fromString(call.parameters["id"])
                     call.respondText(String(node.datastore.read(uuid), Charset.defaultCharset()))
                 } catch (_: Exception) {
-                    println("couldn't get data for id $uuid")
+                    println("couldn't get data")
                 }
             }
 
             put("/update/{id}") {
                 launch {
                     if (node.isLeader()) {
-                        val uuid: UUID = UUID.fromString(call.parameters["id"])
-                        val replicaNodes = JumpHash.getDuplicates(uuid.toString(), node.cluster.size + 1)
-                        val data: ByteArray = call.receive()
-                        val dr = DatastoreRequest(uuid, data)
-                        node.executeRequest(replicaNodes, MessageType.UPDATE_REQUEST, dr)
+                        handleUpdate(call)
                     } else {
                         println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                     }
@@ -84,10 +65,7 @@ fun Application.configureRouting() {
             delete("/delete/{id}") {
                 launch {
                     if (node.isLeader()) {
-                        val uuid: UUID = UUID.fromString(call.parameters["id"])
-                        val dr = DatastoreRequest(uuid)
-                        val replicaNodes = JumpHash.getDuplicates(uuid.toString(), node.cluster.size + 1)
-                        node.executeRequest(replicaNodes, MessageType.DELETE_REQUEST, dr)
+                        handleDelete(call)
                     } else {
                         println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                     }
@@ -101,15 +79,3 @@ val client = HttpClient(CIO) {
     expectSuccess = true
 }
 
-suspend fun getData(nodeId: Int, uuid: UUID): ByteArray {
-    return if (nodeId == node.id) {
-        node.datastore.read(uuid)
-    } else {
-        val o = node.cluster[nodeId]!!
-        try {
-            client.get("http://${o.host}:${o.httpPort}/ds/read/${uuid}").body()
-        } catch (e: Exception) {
-            throw e
-        }
-    }
-}
