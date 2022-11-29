@@ -1,5 +1,6 @@
 package madalv
 
+import madalv.protocols.ws.configureSockets
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -20,9 +21,6 @@ import java.io.File
 
 val node = init()
 
-// TODO start timer for leader timeout
-// TODO implement rest of raft
-
 suspend fun main() {
     // launch tcp server
     CoroutineScope(Dispatchers.Default).launch {
@@ -37,8 +35,8 @@ suspend fun main() {
     // launch http server
     embeddedServer(Netty, port = node.httpPort, host = node.host, module = Application::module).start(wait = false)
 
-    delay(node.electionManager.electionTimeout!!)
-    if (!node.leaderExists()) node.electionManager.initElection()
+    delay(node.electionTimeout())
+    if (!node.leaderExists()) node.initElection()
 
     node.startHeartbeatTimer()
 }
@@ -55,6 +53,6 @@ fun init(): Node {
     val nodes: Map<Int, Node> = Json.decodeFromString(nodesJson)
     val node: Node = nodes.getValue(cfg.id)
     node.setCluster(nodes)
-    node.electionManager.electionTimeout = cfg.electionTimeout
+    node.setElectionTimeout(cfg.electionTimeout)
     return node
 }
