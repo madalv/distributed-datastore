@@ -16,17 +16,21 @@ class JumpHash {
             return b
         }
 
-        fun getDuplicateId(key: String, nrNodes: Int): Int {
-
+        fun getDuplicates(key: String, nrNodes: Int): Set<Int> {
             val originalId = hash(key, nrNodes)
-            var duplicateId = hash(key + secretKey, nrNodes)
+            val set = mutableSetOf(originalId)
 
-            while (duplicateId == originalId) {
-                val dKey = key + secretKey
-                duplicateId = hash(dKey, nrNodes)
+            for (i in 0 until 1) {
+                var duplicateId = hash(key + secretKey, nrNodes)
+
+                while (duplicateId in set) {
+                    val dKey = key + secretKey
+                    duplicateId = hash(dKey, nrNodes)
+                }
+                set.add(duplicateId)
             }
 
-            return duplicateId
+            return set
         }
     }
 }

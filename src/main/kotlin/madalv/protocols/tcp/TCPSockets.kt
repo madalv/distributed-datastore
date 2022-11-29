@@ -3,7 +3,6 @@ package madalv.protocols.tcp
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
-import io.ktor.utils.io.core.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -15,8 +14,6 @@ import madalv.message.Message
 import madalv.message.MessageType
 import madalv.message.VoteResponse
 import madalv.node
-import java.nio.ByteBuffer
-import java.nio.charset.Charset
 
 object TCP {
     private val selectorManager = ActorSelectorManager(Dispatchers.IO)
@@ -33,9 +30,7 @@ object TCP {
                 while (true) {
                     val socket = serverSocket.accept()
                     val read = socket.openReadChannel()
-                    val write = socket.openWriteChannel(autoFlush = true)
 
-                    //println("Accepted ${socket.remoteAddress}.")
                     launch {
                         try {
                             while (true) {
@@ -43,9 +38,6 @@ object TCP {
                                 val message: Message = Json.decodeFromString(Message.serializer(), line!!)
 
                                 when(message.messageType) {
-                                    MessageType.VOTE_REQUEST -> {
-                                        println("ERROR - why sending vote request (broadcast) thru TCP?")
-                                    }
                                     MessageType.VOTE_RESPONSE -> {
                                         val vr = Json.decodeFromString(VoteResponse.serializer(), message.data)
                                         println(" INCOMING VOTE REPSPONSE " + message.data)

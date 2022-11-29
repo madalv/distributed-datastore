@@ -9,8 +9,7 @@ import kotlinx.serialization.json.Json
 import madalv.message.*
 import madalv.node.Node
 import madalv.node.Role
-import madalv.protocols.tcp.TCP
-import madalv.protocols.udp.UDP
+
 import java.util.*
 
 
@@ -18,14 +17,12 @@ import java.util.*
 class ElectionManager(val node: Node) {
     var currentTerm: Int = 0
     var currentLeader: Int? = null
-    var votesReceived: MutableSet<Int> = mutableSetOf()
-    val udpClient = UDP.Client
-    val tcpClient = TCP.Client
-    var votedFor: Int? = null
-    var electionTimer: Timer = Timer()
     var electionTimeout: Long? = null
     val voteResponseChannel: Channel<VoteResponse> = Channel(Channel.UNLIMITED)
-    var electionIsRunning: Boolean = false
+    private var electionIsRunning: Boolean = false
+    private var votesReceived: MutableSet<Int> = mutableSetOf()
+    private var votedFor: Int? = null
+    private var electionTimer: Timer = Timer()
     
     init {
         GlobalScope.launch {
@@ -33,7 +30,6 @@ class ElectionManager(val node: Node) {
         }
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     fun initElection() {
         votesReceived.clear()
         println("Starting election!")
@@ -46,16 +42,13 @@ class ElectionManager(val node: Node) {
         val request = VoteRequest(currentTerm, node.id, node.log().size, lastTerm)
         val message = Message(MessageType.VOTE_REQUEST, Json.encodeToString(VoteRequest.serializer(), request))
 
-        GlobalScope.launch {
-            UDP.Client.broadcast(Json.encodeToString(Message.serializer(), message))
-        }
+        node.broadcast(Json.encodeToString(Message.serializer(), message))
+
         startElectionTimer()
     }
 
     fun vote(vr: VoteRequest) {
-        if (vr.term > currentTerm) {
-            resetNodeElectionStatus(vr.term)
-        }
+        if (vr.term > currentTerm) resetNodeElectionStatus(vr.term)
 
         val lastTerm: Int = if (node.log().size > 0) node.log()[node.log().lastIndex].term else 0
         val logOk = (vr.lastLogTerm > lastTerm) || (vr.lastLogTerm == lastTerm && vr.logLength >= node.log().size)
@@ -106,8 +99,8 @@ class ElectionManager(val node: Node) {
     private fun sendVoteResponse(candidateId: Int, voteGranted: Boolean) {
         val response = VoteResponse(node.id, currentTerm, voteGranted)
         val message = Message(MessageType.VOTE_RESPONSE, Json.encodeToString(VoteResponse.serializer(), response))
-        tcpClient.send(
-            InetSocketAddress(node.cluster[candidateId]!!.host, node.cluster[candidateId]!!.tcpPort),
+        node.send(
+            candidateId,
             Json.encodeToString(Message.serializer(), message))
     }
 

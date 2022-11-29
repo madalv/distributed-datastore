@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import madalv.datastore.DatastoreRequest
-import madalv.log.LogRequest
 import madalv.message.Message
 import madalv.message.MessageType
 import madalv.message.VoteRequest
@@ -33,9 +32,6 @@ object UDP {
                         MessageType.VOTE_REQUEST -> {
                             val vr = Json.decodeFromString(VoteRequest.serializer(), message.data)
                             node.electionManager.vote(vr)
-                        }
-                        MessageType.VOTE_RESPONSE -> {
-                            println("ERROR - why sending vote response (1 to 1 comm) thru UDP?")
                         }
                         MessageType.UPDATE_REQUEST -> {
                             val dr = Json.decodeFromString(DatastoreRequest.serializer(), message.data)

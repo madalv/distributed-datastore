@@ -1,6 +1,9 @@
 package madalv.node
 
 import io.ktor.network.sockets.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -15,6 +18,7 @@ import madalv.message.Message
 import madalv.message.MessageType
 import madalv.protocols.tcp.TCP
 import madalv.protocols.udp.UDP
+import madalv.protocols.ws.updateChannel
 import java.util.*
 
 @Serializable
@@ -35,15 +39,12 @@ class Node(
     @Transient var datastore: Datastore = Datastore()
     // deals with all Raft log stuff (replication, etc, etc)
     @Transient val logManager: LogManager = LogManager(this)
-    // socket clients responsible for sending stuff to other servers
-    @Transient val udpClient = UDP.Client
-    @Transient val tcpClient = TCP.Client
     // timers, explained below
     @Transient var heartbeatTimer = Timer()
     @Transient var timeoutTimer = Timer()
-
-    @Transient val timeoutPeriod: Long = 10100
-    @Transient val heartbeatInterval: Long = 5000
+    // todo read these from cfg
+    @Transient val timeoutPeriod: Long = 10000
+    @Transient val heartbeatInterval: Long = 3500
 
     /**
     dumb name, but this is the timer that checks if the leader hasn't
@@ -60,7 +61,7 @@ class Node(
                     electionManager.initElection()
                 }
             }
-        }, timeoutPeriod + Random(System.currentTimeMillis()).nextInt(1000))
+        }, timeoutPeriod + Random(System.currentTimeMillis()).nextInt(heartbeatInterval.toInt()))
     }
 
     /**
@@ -95,15 +96,15 @@ class Node(
                 send(nodeId, Json.encodeToString(Message.serializer(), message))
             }
         }
+        GlobalScope.launch {
+            updateChannel.send(message)
+        }
+
     }
 
-    fun appendLogEntry(le: LogEntry) {
+    private fun appendLogEntry(le: LogEntry) {
         println("appending $le to log, size ${log().size}")
         logManager.log.add(le)
-    }
-
-    fun send(nodeId: Int, message: String) {
-        tcpClient.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
     }
 
     fun setCluster(nodes: Map<Int, Node>) {
@@ -111,6 +112,18 @@ class Node(
     }
     override fun toString(): String {
         return "{id=$id http=$httpPort, udp=$udpPort, tcp=$tcpPort, host=$host}"
+    }
+
+    fun setElectionTimeout(t: Long) {
+        electionManager.electionTimeout = t
+    }
+
+    fun electionTimeout(): Long {
+        return electionManager.electionTimeout!!
+    }
+
+    fun initElection() {
+        electionManager.initElection()
     }
 
     fun leaderExists(): Boolean {
@@ -151,5 +164,19 @@ class Node(
 
     fun receiveLogRequest(lr: LogRequest) {
         logManager.receiveLogRequest(lr)
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun broadcast(message: String) {
+        GlobalScope.launch {
+            UDP.Client.broadcast(message)
+        }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun send(nodeId: Int, message: String) {
+        GlobalScope.launch {
+            TCP.Client.send(InetSocketAddress(cluster[nodeId]!!.host, cluster[nodeId]!!.tcpPort), message)
+        }
     }
 }

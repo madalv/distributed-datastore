@@ -25,7 +25,6 @@ class Datastore {
     @Synchronized
     fun read(key: UUID): ByteArray {
         return try {
-            //println("READ $key")
             map[key]!!
         } catch (e: Exception) {
             throw e

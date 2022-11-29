@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-class Message (
+data class Message (
     @SerialName("message_type") val messageType: MessageType,
     @SerialName("data") val data: String
     ) {

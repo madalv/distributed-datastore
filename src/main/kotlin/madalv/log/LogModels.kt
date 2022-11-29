@@ -32,7 +32,7 @@ data class LogEntry(
 }
 
 @Serializable
-class LogResponse(
+data class LogResponse(
         @SerialName("node_id") val nodeId: Int,
         @SerialName("term") val term: Int,
         @SerialName("ack") val ack: Int,
