@@ -28,21 +28,18 @@ fun Application.configureRouting() {
             post("/create") {
                 if (node.isLeader()) {
                     runBlocking {
-                        if ((0..2).random() == 1) redirectCreate(call)
-                        else handleCreate(call)
-                    }
-                } else if (call.request.header("Leader-Redirect") == "true") {
-                    runBlocking {
                         handleCreate(call)
                     }
-                }
-                else {
+                } else {
                     println("${node.id} IS NOT LEADER, WHO THE HELL IS SENDING HTTP REQUESTS")
                 }
             }
 
             get("/read/{id}") {
                 if (node.isLeader()) {
+                    if ((0..2).random() == 1) redirectGet(call)
+                    else handleGet(call)
+                } else if (call.request.header("Leader-Redirect") == "true") {
                     handleGet(call)
                 } else try {
                     val uuid: UUID = UUID.fromString(call.parameters["id"])

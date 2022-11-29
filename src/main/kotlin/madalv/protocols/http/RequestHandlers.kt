@@ -70,15 +70,14 @@ suspend fun getData(nodeId: Int, uuid: UUID): ByteArray {
     }
 }
 
-suspend fun redirectCreate(call: ApplicationCall) {
-    val data: ByteArray = call.receive()
+suspend fun redirectGet(call: ApplicationCall) {
+    val uuid: UUID = UUID.fromString(call.parameters["id"])
     val nodeId = (node.cluster.keys).random()
     val o = node.cluster[nodeId]!!
-    client.post("http://${o.host}:${o.httpPort}/ds/create") {
-        setBody(data)
+    client.get("http://${o.host}:${o.httpPort}/ds/read/${uuid}") {
         headers {
             append("Leader-Redirect", "true")
         }
     }
-    println("REDIRECTED CREATE TO $nodeId")
+    println("REDIRECTED GET TO $nodeId")
 }
